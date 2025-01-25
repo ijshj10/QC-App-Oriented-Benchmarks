@@ -122,7 +122,7 @@ QV_transpile_factor = 12.7
 # Base for volumetric plot logarithmic axes
 #depth_base = 1.66  # this stretches depth axis out, but other values have issues:
 #1) need to round to avoid duplicates, and 2) trailing zeros are getting removed 
-depth_base = 2
+depth_base = 10
 
 # suppress plotting for low fidelity at this level
 suppress_low_fidelity_level = 0.015
@@ -1582,16 +1582,40 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None,
         AQ = get_aq_width(shared_data, w_min, w_max, score_metric)
 
         # allow one more in width to accommodate the merge values below
-        max_qubits = int(w_max) + 1  
+        max_qubits = int(w_max) + 1
         
         # draw the appropriate background, given the AQ mode
         if aq_mode > 0:
             ax = plot_volumetric_background_aq(max_qubits=max_qubits, AQ=AQ, depth_base=depth_base,
                 suptitle=suptitle, avail_qubits=avail_qubits, colorbar_label=colorbar_label)
         else:
+            plot_width = 6.8
+            plot_height = 0.5 + plot_width * (35 / max_depth_log) / 2
+
+            fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, height_ratios=[0.1, 1], figsize=(plot_width, plot_height))
+            fig.subplots_adjust(hspace=0.02)
+            plot_volumetric_background(max_qubits=max_qubits, QV=QV, depth_base=depth_base,
+                suptitle='', avail_qubits=avail_qubits, colorbar_label=colorbar_label, ax=ax1, initial_y = 31, y_width=3)
+            d = .25  # proportion of vertical to horizontal extent of the slanted line
+            kwargs = dict(marker=[(-1, -d), (1, d)], markersize=12,
+                          linestyle="none", color='k', mec='k', mew=1, clip_on=False)
+            ax1.plot([0, 1], [0, 0], transform=ax1.transAxes, **kwargs)
+            ax2.plot([0, 1], [1, 1], transform=ax2.transAxes, **kwargs)
             ax = plot_volumetric_background(max_qubits=max_qubits, QV=QV, depth_base=depth_base,
-                suptitle=suptitle, avail_qubits=avail_qubits, colorbar_label=colorbar_label)
-        
+                                       suptitle='', avail_qubits=avail_qubits, colorbar_label=colorbar_label,
+                                       ax=ax2, y_width=19)
+            ax2.set_xlabel('Circuit Depth', fontsize=18)
+            ax.set_ylabel('', fontsize=18)
+
+
+            plt.colorbar(cm.ScalarMappable(cmap=cmap), cax=None, ax=[ax1,ax2],
+                        shrink=0.6, panchor=(0.0, 0.7)).set_label('Success Probability', fontsize=18)
+            ax1.spines['bottom'].set_visible(False)
+            ax1.set_ylabel('')
+            #fig.text(0.1, 0.1, 'Circuit Width', va='center', rotation='Vertical')
+            ax1.axes.get_xaxis().set_visible(False)
+            ax2.spines['top'].set_visible(False)
+
         # create 2D array to hold merged value arrays with gradations, one array for each qubit size
         # plot rectangles representing these result gradations
         if not is_individual:
@@ -1640,7 +1664,18 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None,
                    label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max,
                    max_depth=max_depth, suppress_low_fidelity=suppress_low_fidelity,
                    do_border=False)
-        
+                if appname == 'VQE':
+                    x = depth_index(d_tr_data[-1], 10)
+                    ax1.add_patch(box_at(x , 2, f_data[-1], 1, 1, 1, 1))
+                    ax1.annotate('VQE',
+                                xy=(x, 2),
+                                arrowprops=dict(facecolor='black', shrink=0.0,
+                                                width=0.5, headwidth=4, headlength=5, edgecolor=(0.8, 0.8, 0.8)),
+                                xytext=(x + 2.0, 2 - 0.2),
+                                horizontalalignment='left', verticalalignment='baseline',
+                                color=(0.2, 0.2, 0.2),
+                                clip_on=True)
+
         if appname == None:
             print(f"ERROR: cannot find data file for: {get_backend_label()}")
             
@@ -1693,6 +1728,7 @@ def plot_merged_result_rectangles(shared_data, ax, max_qubits, w_max, num_grads=
             continue
             
         w_data = group_metrics["groups"]
+        w_data = [str(int(w)//2) for w in w_data]
         d_data = group_metrics["avg_depths"]
         d_tr_data = group_metrics["avg_tr_depths"]
         
@@ -3155,7 +3191,7 @@ def format_number(num, digits=0):
 ##### Volumetric Plots
 
 # Plot the background for the volumetric analysis    
-def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None, avail_qubits=0, colorbar_label="Avg Result Fidelity"):
+def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None, avail_qubits=0, colorbar_label="Avg Result Fidelity", ax=None, initial_y=1, y_width=None):
     
     if suptitle == None:
         suptitle = f"Volumetric Positioning\nCircuit Dimensions and Fidelity Overlaid on Quantum Volume = {QV}"
@@ -3178,6 +3214,9 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
     if max_qubits > 11: max_width = 18
     if max_qubits > 14: max_width = 20
     if max_qubits > 16: max_width = 24
+    max_width = 16
+    if y_width:
+        max_width = y_width
     #print(f"... {avail_qubits} {max_qubits} {max_width}")
     
     plot_width = 6.8
@@ -3185,7 +3224,8 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
     #print(f"... {plot_width} {plot_height}")
     
     # define matplotlib figure and axis; use constrained layout to fit colorbar to right
-    fig, ax = plt.subplots(figsize=(plot_width, plot_height), constrained_layout=True)
+    if ax == None:
+        fig, ax = plt.subplots(figsize=(plot_width, plot_height), constrained_layout=True)
 
     plt.suptitle(suptitle)
 
@@ -3206,11 +3246,9 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
 
     # circuit width axis (y axis)
     ybasis = [y for y in range(1,max_width)]
-    yround = [1,2,3,4,5,6,7,8,10,12,15]     # not used now
-    ylabels = [str(y) for y in yround]      # not used now 
-    #ax.set_ylabel('Circuit Width (Number of Qubits)')
+    ylabel = [str((y+initial_y - 1)*2) for y in range(1, max_width)]
     ax.set_ylabel('Circuit Width')
-    ax.set_yticks(ybasis)
+    ax.set_yticks(ybasis, ylabel)
 
     #create simple line plot (not used right now)
     #ax.plot([0, 10],[0, 10])
@@ -3220,10 +3258,10 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
     QV_depth = log2QV * QV_transpile_factor
     
     # show a quantum volume rectangle of QV = 64 e.g. (6 x 6)
-    if QV0 != 0:
-        ax.add_patch(qv_box_at(1, 1, QV_width, QV_depth, 0.87, depth_base))
-    else:
-        ax.add_patch(qv_box_at(1, 1, QV_width, QV_depth, 0.91, depth_base))
+    # if QV0 != 0:
+    #     ax.add_patch(qv_box_at(1, 1, QV_width, QV_depth, 0.87, depth_base))
+    # else:
+    #     ax.add_patch(qv_box_at(1, 1, QV_width, QV_depth, 0.91, depth_base))
     
     # the untranspiled version is commented out - we do not show this by default
     # also show a quantum volume rectangle un-transpiled
@@ -3240,14 +3278,14 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
             continue
         
         i_success = 0
-        for d in xround:
+        for d in xround[:5]:
         
             # polarization factor for low circuit widths
-            maxtest = maxprod / ( 1 - 1 / (2**w) )
+            # maxtest = maxprod / ( 1 - 1 / (2**(w)) )
             
             # if circuit would fail here, don't draw box
-            if d > maxtest: continue
-            if w * d > maxtest: continue
+            # if d > maxtest: continue
+            # if (w+ initial_y - 1) * d > maxtest: continue
             
             # guess for how to capture how hardware decays with width, not entirely correct
 
@@ -3258,12 +3296,15 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
             #     maxtest = maxtest / (1 + (over/QV_width))
 
             # draw a box at this width and depth
-            id = depth_index(d, depth_base) 
+            id = depth_index(d, depth_base)
+            if id >= 4 and (w >4 or y_width <= 4):
+                break
             
             # show vb rectangles; if not showing QV, make all hollow (or less dark)
             if QV0 == 0:
                 #ax.add_patch(bkg_empty_box_at(id, w))
                 ax.add_patch(bkg_box_at(id, w, 0.95))
+
             
             else:
                 ax.add_patch(bkg_box_at(id, w, 0.9))
@@ -3284,9 +3325,9 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
                 bbox=dict(boxstyle="square,pad=0.3", fc=(.9,.9,.9), ec="grey", lw=1))
                 
     # add colorbar to right of plot
-    plt.colorbar(cm.ScalarMappable(cmap=cmap), cax=None, ax=ax,
-            shrink=0.6, label=colorbar_label, panchor=(0.0, 0.7))
-            
+#    plt.colorbar(cm.ScalarMappable(cmap=cmap), cax=None, ax=ax,
+#            shrink=0.6, label=colorbar_label, panchor=(0.0, 0.7))
+
     return ax
 
 
@@ -3710,10 +3751,10 @@ def anno_volumetric_data(ax, depth_base=2, label='Depth',
     global x_anno_offs, y_anno_offs, anno_labels, x_annos, y_annos
     all_annos = sorted(zip(x_anno_offs, y_anno_offs, anno_labels, x_annos, y_annos))
     x_anno_offs = [a for a,b,c,d,e in all_annos]
-    y_anno_offs = [b for a,b,c,d,e in all_annos]
+    y_anno_offs = [b / 2 for a,b,c,d,e in all_annos]
     anno_labels = [c for a,b,c,d,e in all_annos]
     x_annos = [d for a,b,c,d,e in all_annos]
-    y_annos = [e for a,b,c,d,e in all_annos]
+    y_annos = [e / 2 for a,b,c,d,e in all_annos]
     
     #print(f"{x_anno_offs}")
     #print(f"{y_anno_offs}")
@@ -3738,7 +3779,7 @@ def anno_volumetric_data(ax, depth_base=2, label='Depth',
             xy=(x_anno+0.0, y_anno+0.1),
             arrowprops=dict(facecolor='black', shrink=0.0,
                 width=0.5, headwidth=4, headlength=5, edgecolor=(0.8,0.8,0.8)),
-            xytext=(x_anno_off + labelpos[0], y_anno_off + labelpos[1]),
+            xytext=(x_anno_off + labelpos[0], y_anno_off - 2),
             rotation=labelrot,
             horizontalalignment='left', verticalalignment='baseline',
             color=(0.2,0.2,0.2),
