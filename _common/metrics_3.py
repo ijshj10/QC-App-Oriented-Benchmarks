@@ -122,7 +122,7 @@ QV_transpile_factor = 12.7
 # Base for volumetric plot logarithmic axes
 #depth_base = 1.66  # this stretches depth axis out, but other values have issues:
 #1) need to round to avoid duplicates, and 2) trailing zeros are getting removed 
-depth_base = 4
+depth_base = 16
 
 # suppress plotting for low fidelity at this level
 suppress_low_fidelity_level = 0.015
@@ -1772,13 +1772,12 @@ def plot_merged_result_rectangles(shared_data, ax, max_qubits, w_max, num_grads=
                 if suppress_low_fidelity and f < suppress_low_fidelity_level:
                     if low_fidelity_count: break
                     else: low_fidelity_count = True
-                ax.add_patch(box4_at(x, np.log2(y), f, type=1, fill=True))
+                ax.add_patch(box4_at(x, y, f, type=1, fill=True))
                 #ax.add_patch(box4_at(x, y / 2, f, type=1, fill=True))
         
     # draw borders at w,d location of each cell, offset to account for the merge process above
     for (x,y) in borders:
         x = x/4 + 0.125
-        y = np.log2(y)
         ax.add_patch(box_at(x, y, f, type=1, fill=False))
         
     #print("**** merged...")
@@ -3178,11 +3177,10 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
     max_width = 13
     if max_qubits > 11: max_width = 18
     if max_qubits > 14: max_width = 20
-    if max_qubits > 16: max_width = 24
-    max_width = 12
+    if max_qubits > 16: max_width = 27
     #print(f"... {avail_qubits} {max_qubits} {max_width}")
     
-    plot_width = 10.0
+    plot_width = 6.8
     plot_height = 0.5 + plot_width * (max_width / max_depth_log)
     #print(f"... {plot_width} {plot_height}")
     
@@ -3210,7 +3208,7 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
     # circuit width axis (y axis)
     ybasis = [y for y in range(1, max_width)]
     yround = [1,2,3,4,5,6,7,8,10,12,15]     # not used now
-    ylabels = [2**y for y in range(1, max_width)]      # not used now
+    ylabels = [y +15  for y in range(1, max_width)]      # not used now
     #ax.set_ylabel('Circuit Width (Number of Qubits)')
     ax.set_ylabel('', fontsize=18)
     ax.set_yticks(ybasis, ylabels)
@@ -3717,11 +3715,11 @@ def anno_volumetric_data(ax, depth_base=2, label='Depth',
     all_annos = sorted(zip(x_anno_offs, y_anno_offs, anno_labels, x_annos, y_annos))
     x_anno_offs = [a for a,b,c,d,e in all_annos]
     y_anno_offs = [b for a, b, c, d, e in all_annos]
-    y_anno_offs = [np.log2(b) for a,b,c,d,e in all_annos]
+    y_anno_offs = [b for a,b,c,d,e in all_annos]
     anno_labels = [c for a,b,c,d,e in all_annos]
     x_annos = [d for a,b,c,d,e in all_annos]
     y_annos = [e for a, b, c, d, e in all_annos]
-    y_annos = [np.log2(e) for a,b,c,d,e in all_annos]
+    y_annos = [e for a,b,c,d,e in all_annos]
     
     #print(f"{x_anno_offs}")
     #print(f"{y_anno_offs}")
